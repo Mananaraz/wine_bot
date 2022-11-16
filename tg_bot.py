@@ -5,7 +5,7 @@ from telegram import *
 from telegram.ext import *
 import coloredlogs, logging
 from datetime import timedelta, datetime, time
-from pytz import timezone, UTC
+import json
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -19,8 +19,17 @@ class TelegramBot:
 
         self.updater = Updater(token=token)
         self.dispatcher = self.updater.dispatcher
+        self.job_queue = JobQueue()
 
         self.tmp_data = {}
+        with open("job.json") as file:
+            self.job = json.load(file)
+        for chat_id in self.job:
+            first = str_to_time(self.job[chat_id]) - datetime.now()
+            self.updater.job_queue.run_repeating(self.start, interval=timedelta(seconds=10),
+                                        first=first,
+                                        context=chat_id)
+            self.updater.job_queue.start()
 
         text_filter = ~Filters.command(False)
 
@@ -51,20 +60,31 @@ class TelegramBot:
 
     def run(self):
         self.updater.start_polling()
+        self.updater.idle()
 
     def weekly_job(self, update, context: CallbackContext):
-        self.send_message(update, "Ира, с днём рождения! А что умеет этот бот, ты узнаешь завтра")
         # context.job_queue.run_repeating(self.start, interval=timedelta(weeks=1),
         #                                 first=datetime(year=2022, month=11, day=16,
         #                                                hour=1, minute=28) - datetime.now(),
         #                                 context=context)
-        context.job_queue.run_repeating(self.start, interval=timedelta(weeks=1),
-                                        first=timedelta(seconds=1),
+        if update.message.chat_id in self.job.keys():
+            return ConversationHandler.END
+        self.send_message(update, "Ира, с днём рождения! А что умеет этот бот, ты узнаешь завтра")
+        first = datetime(year=2022, month=11, day=16, hour=1, minute=28)
+        self.job[update.message.chat_id] = time_to_str(first)
+        json.dump(self.job, open('job.json', 'w'))
+        context.job_queue.run_repeating(self.start, interval=timedelta(seconds=10),
+                                        first=first - datetime.now(),
                                         context=update.message.chat_id)
         context.job_queue.start()
         return ConversationHandler.END
 
     def start(self, context):
+        chat_id = context.job.context
+        first = str_to_time(self.job[chat_id])
+        first += timedelta(seconds=10)
+        self.job[chat_id] = time_to_str(first)
+        json.dump(self.job, open('job.json', 'w'))
         ### добавить проверку на пользователя
         keyboard = [
             ['Давай по классике, вдарим красного'],
@@ -74,7 +94,7 @@ class TelegramBot:
         ]
 
         reply_markup = ReplyKeyboardMarkup(keyboard)
-        self.updater.bot.send_message(chat_id=context.job.context, text="Эта пятница не обойдётся без вина. Какое?",
+        self.updater.bot.send_message(chat_id=chat_id, text="Эта пятница не обойдётся без вина. Какое?",
                                       reply_markup=reply_markup)
         return 1
 
@@ -125,6 +145,15 @@ class TelegramBot:
 
     def cancel(self, update, context):
         return ConversationHandler.END
+
+
+def time_to_str(time: datetime):
+    return f'{time.year} {time.month} {time.day} {time.hour} {time.minute} {time.second}'
+
+
+def str_to_time(string: str):
+    year, month, day, hour, minute, second = [int(x) for x in string.split()]
+    return datetime(year, month, day, hour, minute, second)
 
 
 if __name__ == '__main__':
