@@ -6,6 +6,7 @@ from telegram.ext import *
 import coloredlogs, logging
 from datetime import timedelta, datetime, time
 import json
+from random import randint
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -14,8 +15,8 @@ logging.basicConfig(
 
 class TelegramBot:
     def __init__(self):
-        token = '1111327991:AAEfAijEz68wdHdVwFL53LYeuWVf9vuypTY'  # test bot
-        # token = '5562371099:AAE-s2UU7w6QbQCV9lCubBLVWHjpb4QMAC0'
+        # token = '1111327991:AAEfAijEz68wdHdVwFL53LYeuWVf9vuypTY'  # test bot
+        token = '5562371099:AAE-s2UU7w6QbQCV9lCubBLVWHjpb4QMAC0'
 
         self.updater = Updater(token=token)
         self.dispatcher = self.updater.dispatcher
@@ -24,11 +25,12 @@ class TelegramBot:
         self.tmp_data = {}
         with open("job.json") as file:
             self.job = json.load(file)
+        print(self.job)
         for chat_id in self.job:
             first = str_to_time(self.job[chat_id]) - datetime.now()
-            self.updater.job_queue.run_repeating(self.start, interval=timedelta(seconds=10),
-                                        first=first,
-                                        context=chat_id)
+            self.updater.job_queue.run_repeating(self.start, interval=timedelta(weeks=2),
+                                                 first=first,
+                                                 context=chat_id)
             self.updater.job_queue.start()
 
         text_filter = ~Filters.command(False)
@@ -37,20 +39,23 @@ class TelegramBot:
         self.dispatcher.add_handler(CommandHandler('chat_id', self.chat_id))
         self.dispatcher.add_handler(
             ConversationHandler(
-                entry_points=[MessageHandler(Filters.regex('Давай по классике, вдарим красного'), self.second_question,
+                entry_points=[MessageHandler(Filters.regex('Давай по классике, вдарим красного'), self.send_to_courier,
                                              pass_job_queue=True),
-                              MessageHandler(Filters.regex('Давай лёгонького беленького'), self.second_question,
+                              MessageHandler(Filters.regex('Давай лёгонького беленького'), self.send_to_courier,
                                              pass_job_queue=True),
-                              MessageHandler(Filters.regex('Ой, хочется пузырёчков'), self.second_question,
+                              MessageHandler(Filters.regex('Ой, хочется пузырёчков'), self.send_to_courier,
                                              pass_job_queue=True),
-                              MessageHandler(Filters.regex('К чёрту вино'), self.second_question, pass_job_queue=True)],
-                states={1: [MessageHandler(Filters.regex('Красное'), self.third_question),
-                            MessageHandler(Filters.regex('Белое'), self.third_question),
-                            MessageHandler(Filters.regex('Розовое'), self.third_question)],
-                        2: [MessageHandler(Filters.regex('Сухое'), self.send_to_courier),
-                            MessageHandler(Filters.regex('Полусухое'), self.send_to_courier),
-                            MessageHandler(Filters.regex('Полусладкое'), self.send_to_courier),
-                            MessageHandler(Filters.regex('Сладкое'), self.send_to_courier)]},
+                              MessageHandler(Filters.regex('Вино красненькое'), self.send_to_courier,
+                                             pass_job_queue=True),
+                              MessageHandler(Filters.regex('К чёрту вино'), self.send_to_courier,
+                                             pass_job_queue=True),
+                              MessageHandler(Filters.regex('Вино беленькое'), self.send_to_courier,
+                                             pass_job_queue=True),
+                              MessageHandler(Filters.regex('Пивас-деребас'), self.send_to_courier,
+                                             pass_job_queue=True),
+                              MessageHandler(Filters.regex('Мальчик, водочки нам принеси'), self.send_to_courier,
+                                             pass_job_queue=True)],
+                states={},
                 fallbacks=[CommandHandler("cancel", self.start),
                            MessageHandler(Filters.regex("Назад"), self.start)]))
         self.dispatcher.add_handler(MessageHandler(text_filter, self.send_non_msg))
@@ -63,17 +68,19 @@ class TelegramBot:
         self.updater.idle()
 
     def weekly_job(self, update, context: CallbackContext):
-        # context.job_queue.run_repeating(self.start, interval=timedelta(weeks=1),
-        #                                 first=datetime(year=2022, month=11, day=16,
-        #                                                hour=1, minute=28) - datetime.now(),
-        #                                 context=context)
-        if update.message.chat_id in self.job.keys():
+        print(update.message.chat_id)
+        if str(update.message.chat_id) in self.job.keys():
             return ConversationHandler.END
-        self.send_message(update, "Ира, с днём рождения! А что умеет этот бот, ты узнаешь завтра")
-        first = datetime(year=2022, month=11, day=16, hour=1, minute=28)
+        self.send_message(update, "Ира, привет! Я телеграмный бот, и да, я - твой подарок на день рождения. Я умею дарить радость. Ну, не постоянно, конечно, а раз в две недели. Зато целый год! Да-да, я работаю до 16 ноября 2023 года. А потом уйду в закат.\n"
+                                  "Дарить радость можно по-разному. Так вот, каждые две недели я буду сам сочинять для тебя вульгарные матерные анекдоты! Ну как? Рада? Знаааю, ты всегда такое хотела, шалунья, теперь будешь каждый раз ждать новый пошленький анектодик от меня!\n"
+                                  "Возможно, ты уже успела понять, что я бот с юмором. Ха-ха-ха (компьютерным голосом). Нет, я не буду сочинять для тебя анекдоты, хотя я умею, обращайся, если станет скучно.\n"
+                                  "Я буду возить тебе вино. Каждую вторую пятницу. В году примерно 52 недели, так что 26 порций ждет тебя. Порций, а не бутылок, да-да. Ты можешь иногда, когда сииильно весело или оооочень грустно, получить по две штуки. Ну, не обижайся, если вторая окажется портвешком, я всё-таки еврей.\n"
+                                  "Что тебе надо делать? Отвечать по четвергам перед долгожданной Великой Доставочной Пятницей на мои вопросы. Их будет немного. Да, я задаю вопросы заранее, ведь мне надо еще вырастить виноград, собрать его, подавить его в бочке моими ботовскими ногами (а это сложно), и налить в бутылку получившийся великолепный напиток. Бутылка будет в пятницу материализовываться у тебя под дверью. Сама.  Да, я маг и волшебник. Кстати, можешь заказывать и не вино. Ну, вдруг заскучаешь по русской беленькой.\n"
+                                  "В общем, пользуйся мной как хочешь. Мне можно писать в свободной форме что хочешь и когда хочешь. Но по доставке - жди  вопросов. Так что дерзай. Рррррррр.")
+        first = datetime(year=2022, month=11, day=17, hour=23, minute=0)
         self.job[update.message.chat_id] = time_to_str(first)
         json.dump(self.job, open('job.json', 'w'))
-        context.job_queue.run_repeating(self.start, interval=timedelta(seconds=10),
+        context.job_queue.run_repeating(self.start, interval=timedelta(weeks=2),
                                         first=first - datetime.now(),
                                         context=update.message.chat_id)
         context.job_queue.start()
@@ -82,38 +89,37 @@ class TelegramBot:
     def start(self, context):
         chat_id = context.job.context
         first = str_to_time(self.job[chat_id])
-        first += timedelta(seconds=10)
+        first += timedelta(weeks=2)
         self.job[chat_id] = time_to_str(first)
         json.dump(self.job, open('job.json', 'w'))
         ### добавить проверку на пользователя
-        keyboard = [
-            ['Давай по классике, вдарим красного'],
-            ['Давай лёгонького беленького'],
-            ['Ой, хочется пузырёчков'],
-            ['К чёрту вино']
-        ]
-
-        reply_markup = ReplyKeyboardMarkup(keyboard)
-        self.updater.bot.send_message(chat_id=chat_id, text="Эта пятница не обойдётся без вина. Какое?",
-                                      reply_markup=reply_markup)
+        if randint(1, 3) == 1:
+            keyboard = [
+                ['Давай по классике, вдарим красного'],
+                ['Давай лёгонького беленького'],
+                ['Ой, хочется пузырёчков'],
+                ['К чёрту вино']
+            ]
+            reply_markup = ReplyKeyboardMarkup(keyboard)
+            self.updater.bot.send_message(chat_id=chat_id, text="Эта пятница не обойдётся без вина. Какое?",
+                                          reply_markup=reply_markup)
+        else:
+            keyboard = [
+                ['Вино красненькое'],
+                ['Вино беленькое'],
+                ['Пивас-деребас'],
+                ['Мальчик, водочки нам принеси']
+            ]
+            reply_markup = ReplyKeyboardMarkup(keyboard)
+            self.updater.bot.send_message(chat_id=chat_id, text="Ну-ка мечи стаканы на стол. Подо что стаканы?",
+                                          reply_markup=reply_markup)
         return 1
-
-    def second_question(self, update, context):
-        print('хуй')
-        return 1
-
-    def third_question(self, update, context):
-
-        return 2
 
     def send_to_courier(self, update, context):
-        self.wine_cual = update.message.text
-        context.bot.send_message(chat_id=460209939, text=f"Настроение: {self.mood}\n"
-                                                         f"Хочет {self.wine_color} {self.wine_cual}")
-        context.bot.send_message(chat_id=363972614, text=f"Настроение: {self.mood}\n"
-                                                         f"Хочет {self.wine_color} {self.wine_cual}")
-        self.send_message(update, "Курьеру направлена информация, жди его сегодня после 18 часов\n\n"
-                                  'Чтобы выбрать вино на следующую неделю просто напиши "Хочу вина!"')
+        self.reply = update.message.text
+        context.bot.send_message(chat_id=460209939, text=f"Сегодня Ирина хочет {self.reply}")
+        context.bot.send_message(chat_id=363972614, text=f"Сегодня Ирина хочет {self.reply}")
+        self.send_message(update, "Ира, ты сделала свой выбор. Смиренно ожидай")
         return ConversationHandler.END
 
     def chat_id(self, update, context):
@@ -122,9 +128,12 @@ class TelegramBot:
 
     def send_non_msg(self, update, context):
         msg = update.message.text
-        if update.message.chat_id == 460209939 or update.message.chat_id == 316284874:
-            context.bot.send_message(chat_id=000000000000000000000000000000, text=msg)
+        if update.message.chat_id == 460209939 or update.message.chat_id == 316284874 or \
+                update.message.chat_id == 363972614:
+            context.bot.send_message(chat_id=581960599, text=msg)
         context.bot.send_message(chat_id=460209939, text=msg)
+        context.bot.send_message(chat_id=316284874, text=msg)
+        context.bot.send_message(chat_id=363972614, text=msg)
         return ConversationHandler.END
 
     def send_message(self, update, msg, reply_markup=None, **kwargs):
